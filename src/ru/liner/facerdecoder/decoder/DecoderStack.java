@@ -59,16 +59,12 @@ public class DecoderStack {
             rawValue = mathEvaluated;
             stringBuilder.append(MathEvaluator.class.getSimpleName()).append(" -> [").append(rawValue).append("] ");
         }
-
         String conditionEvaluated = new ConditionEvaluator(rawValue).evaluate();
         if (!conditionEvaluated.equals(rawValue)) {
             rawValue = conditionEvaluated;
             stringBuilder.append(ConditionEvaluator.class.getSimpleName()).append(" -> [").append(rawValue).append("] ");
         }
-
-        long endTime = System.nanoTime();
-        long elapsedTime = endTime - startTime;
-        System.out.println("[INFO]Decode took " + (elapsedTime / 1000000f) + " ms. Stack: " + encodedText + " | " + stringBuilder);
+        System.out.println("[INFO]Decode took " + ((System.nanoTime() - startTime) / 1000000f) + " ms. Stack: " + encodedText + " | " + stringBuilder);
         return rawValue;
     }
 

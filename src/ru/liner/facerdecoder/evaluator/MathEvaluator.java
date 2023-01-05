@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * @created : 02.01.2023, понедельник
  **/
 public class MathEvaluator {
-    private static final Pattern bracketPattern = Pattern.compile("\\(([0-9a-zA-Z+|\\-|\\/|\\*.]*)\\)");
+    private static final Pattern bracketPattern = Pattern.compile("\\(([ 0-9a-zA-Z+|\\-|\\/|\\*.]*)\\)");
     private static final Pattern functionPattern = Pattern.compile("[a-zA-Z]([a-zAZ]*)\\(");
     public static final List<MathMethod> methodList = MathMethod.mathMethodList();
     public static final List<Function> functionList = MathMethod.functionList();
@@ -34,7 +34,20 @@ public class MathEvaluator {
         this.value = value;
     }
 
+    private boolean shouldEvaluate(String value) {
+        return value.contains("+") ||
+                value.contains("-") ||
+                value.contains("/") ||
+                value.contains("*") ||
+                value.contains("(") ||
+                value.contains(")") ||
+                value.contains("[") ||
+                value.contains("]");
+    }
+
     public String evaluate() {
+        if (!shouldEvaluate(value))
+            return value;
         String evaluated = process(parseMethods(value), new MathEvaluateProvider());
         if (evaluated.contains("?") || evaluated.contains(":")) {
             if (evaluated.contains("(") && evaluated.contains(")")) {
@@ -48,16 +61,36 @@ public class MathEvaluator {
     }
 
 
-    private static String process(String input, EvaluateProvider provider) {
-        String result = input;
+    private String process(String input, EvaluateProvider provider) {
+        String result = input.trim();
         List<String> brackets = new ArrayList<>();
         Matcher matcher = bracketPattern.matcher(input);
         while (matcher.find())
             brackets.add(matcher.group());
         for (String bracket : brackets)
             result = result.replace(bracket, provider.provide(bracket.replace("(", "").replace(")", "")));
-        return result.contains("?") || result.contains(":") ? result : result.contains("(") || result.contains(")") ? process(result, provider) : provider.provide(result);
+        if (shouldEvaluate(result))
+            return result.contains("?") || result.contains(":") ? result : result.contains("(") || result.contains(")") ? process(result, provider) : provider.provide(result);
+        return result;
     }
+
+
+    private String parseMethods(String value) {
+        value = value.trim();
+        String[] method = extractFunctionAndParams(value);
+        if (method != null) {
+            String methodName = method[0];
+            String methodParams = method[1];
+            for (MathMethod mathMethod : methodList) {
+                if (methodParams.contains(mathMethod.getName()))
+                    methodParams = parseMethods(methodParams);
+            }
+            return MathMethod.eval(methodName + "(" + process(methodParams, new MathEvaluateProvider()) + ")");
+        } else {
+            return value;
+        }
+    }
+
 
     public static String[] extractFunctionAndParams(String input) {
         Matcher matcher = functionPattern.matcher(input);
@@ -78,22 +111,6 @@ public class MathEvaluator {
             return new String[]{function, contentBuilder.toString()};
         } else {
             return null;
-        }
-    }
-
-    private String parseMethods(String value) {
-        String[] method = extractFunctionAndParams(value);
-        if(method != null){
-            String methodName = method[0];
-            String methodParams = method[1];
-            for(MathMethod mathMethod:methodList){
-                if(methodParams.contains(mathMethod.getName()))
-                    methodParams = parseMethods(methodParams);
-            }
-            methodParams = process(methodParams, new MathEvaluateProvider());
-            return MathMethod.eval(methodName + "(" + methodParams + ")");
-        } else {
-            return value;
         }
     }
 }
