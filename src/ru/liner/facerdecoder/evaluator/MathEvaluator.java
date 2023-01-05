@@ -7,6 +7,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,7 +18,7 @@ import java.util.regex.Pattern;
  **/
 public class MathEvaluator {
     private static final Pattern bracketPattern = Pattern.compile("\\(([0-9a-zA-Z+|\\-|\\/|\\*.]*)\\)");
-    public static final String PARAM_SEPARATOR = ",";
+    private static final Pattern functionPattern = Pattern.compile("[a-zA-Z]([a-zAZ]*)\\(");
     public static final List<MathMethod> methodList = MathMethod.mathMethodList();
     public static final List<Function> functionList = MathMethod.functionList();
     public static final NumberFormat numberFormat = NumberFormat.getInstance(Locale.US);
@@ -58,75 +59,41 @@ public class MathEvaluator {
         return result.contains("?") || result.contains(":") ? result : result.contains("(") || result.contains(")") ? process(result, provider) : provider.provide(result);
     }
 
-    private String parseMethods(String value) {
-        if (value == null || value.trim().length() <= 0) {
+    public static String[] extractFunctionAndParams(String input) {
+        Matcher matcher = functionPattern.matcher(input);
+        if (matcher.find()) {
+            String function = matcher.group().substring(0, matcher.group().length() - 1);
+            String rawValue = input.substring(input.indexOf(function), input.lastIndexOf(")"));
+            AtomicInteger openParenthesesCount = new AtomicInteger((int) rawValue.chars().filter(character -> character == '(').count());
+            StringBuilder contentBuilder = new StringBuilder();
+            rawValue.chars()
+                    .mapToObj(i -> (char) i)
+                    .skip(rawValue.indexOf("(") + 1)
+                    .takeWhile(i -> {
+                        if (i == ')')
+                            openParenthesesCount.getAndDecrement();
+                        return openParenthesesCount.get() > 0;
+                    })
+                    .forEach(contentBuilder::append);
+            return new String[]{function, contentBuilder.toString()};
+        } else {
             return null;
         }
-        String output = value.trim();
-        if (output.length() > 0) {
-            int latestIndex;
-            do {
-                latestIndex = getLatestMethodIndex(output);
-                if (latestIndex >= 0) {
-                    String methodString = output.substring(latestIndex);
-                    int[] indices = getMethodIndices(methodString);
-                    if (indices[1] >= 0) {
-                        StringBuilder compiledMethodBuilder = new StringBuilder();
-                        compiledMethodBuilder.append(methodString.substring(0, indices[0]));
-                        compiledMethodBuilder.append("(");
-                        String[] params = methodString.substring(indices[0] + 1, indices[1]).split(PARAM_SEPARATOR);
-                        for (int i = 0; i < params.length; i++) {
-                            if (i > 0) {
-                                compiledMethodBuilder.append(PARAM_SEPARATOR);
-                            }
-                            String evaluatedParam = process(parseMethods(params[i]), new MathEvaluateProvider());
-                            ;
-                            if (evaluatedParam != null) {
-                                compiledMethodBuilder.append(evaluatedParam);
-                            }
-                        }
-                        compiledMethodBuilder.append(")");
-                        String methodResult = MathMethod.eval(compiledMethodBuilder.toString());
-                        output = output.substring(0, latestIndex) + methodResult + methodString.substring(indices[1] + 1);
-                    }
-                }
-            } while (latestIndex >= 0);
-            return output;
-        }
-        return output;
     }
 
-
-    private int getLatestMethodIndex(String output) {
-        int latestIndex = -1;
-        for (MathMethod method : methodList) {
-            int lastMethodIndex = output.lastIndexOf(method.getName());
-            if (lastMethodIndex > latestIndex)
-                latestIndex = lastMethodIndex;
-        }
-        return latestIndex;
-    }
-
-    private int[] getMethodIndices(String methodString) {
-        int beginningParanIndex = -1;
-        int endingParenIndex = -1;
-        int depth = 0;
-        int i = 0;
-        while (true) {
-            if (i >= methodString.length()) {
-                break;
+    private String parseMethods(String value) {
+        String[] method = extractFunctionAndParams(value);
+        if(method != null){
+            String methodName = method[0];
+            String methodParams = method[1];
+            for(MathMethod mathMethod:methodList){
+                if(methodParams.contains(mathMethod.getName()))
+                    methodParams = parseMethods(methodParams);
             }
-            if (methodString.charAt(i) == '(' || methodString.charAt(i) == '[') {
-                if (depth == 0) {
-                    beginningParanIndex = i;
-                }
-                depth++;
-            } else if ((methodString.charAt(i) == ')' || methodString.charAt(i) == ']') && depth - 1 == 0) {
-                endingParenIndex = i;
-                break;
-            }
-            i++;
+            methodParams = process(methodParams, new MathEvaluateProvider());
+            return MathMethod.eval(methodName + "(" + methodParams + ")");
+        } else {
+            return value;
         }
-        return new int[]{beginningParanIndex, endingParenIndex};
     }
 }
