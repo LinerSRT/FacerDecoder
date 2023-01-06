@@ -1,18 +1,13 @@
-package ru.liner.facerdecoder.evaluator;
+package ru.liner.facerdecoder;
 
 
-import net.objecthunter.exp4j.Expression;
-import net.objecthunter.exp4j.ExpressionBuilder;
 import net.objecthunter.exp4j.function.Function;
 import ru.liner.facerdecoder.anroidwrapper.*;
 import ru.liner.facerdecoder.utils.MathUtils;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * @author : "Line'R"
@@ -39,7 +34,7 @@ public enum MathMethod {
                 return 0f;
             double value = doubles[0];
             double digits = doubles[1];
-            return Double.parseDouble(String.format("%0"+digits+"d", value));
+            return Double.parseDouble(String.format("%0" + digits + "d", value));
         }
     }),
     SIN(new Function("sin") {
@@ -308,41 +303,10 @@ public enum MathMethod {
             return 0;
         }
     });
-    private final String name;
     private final Function function;
 
     MathMethod(Function function) {
         this.function = function;
-        this.name = function.getName();
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public static String eval(String text) {
-        if (text.contains("VAR")){
-            Pattern pattern = Pattern.compile("#VAR_([0-9]*)#");
-            Matcher matcher = pattern.matcher(text);
-            while (matcher.find()){
-                text = text.replace(matcher.group(), "0");
-            }
-        }
-        try {
-            Expression expression = new ExpressionBuilder(text)
-                    .variables("pi", "e")
-                    .functions(MathEvaluator.functionList)
-                    .build()
-                    .setVariable("pi", Math.PI)
-                    .setVariable("e", Math.E);
-            String result = MathEvaluator.numberFormat.format(expression.evaluate());
-            if (result.endsWith(".0"))
-                return result.substring(0, result.length() - 2);
-            return result;
-        } catch (Exception e) {
-
-            return "0";
-        }
     }
 
     public static List<MathMethod> mathMethodList() {
